@@ -51,8 +51,15 @@ function App() {
   };
 
   const addCard = (card) => {
-    setCards((prevCards) => [...prevCards, card]);
-    setCurrentPage('cardList'); 
+    setCards((prevCards) => [
+      ...prevCards,
+      {
+        ...card,
+        monthly: 0,
+        total: 0,
+      }
+    ]);
+    setCurrentPage('cardList');
   };
 
   const deleteCard = (index) => {

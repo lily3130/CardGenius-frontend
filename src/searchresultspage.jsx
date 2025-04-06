@@ -73,11 +73,9 @@ function SearchResultsPage({ results = [], isPremium, onBack, onCardChoose, adsE
       <div className="result-footer">
         <div className="result-buttons">
           <button className="button" onClick={onBack}>Back to Search</button>
-          {isPremium===true && (
-            <button className="button" onClick={() => onCardChoose(current.name)}>
+          <button className="button" onClick={() => onCardChoose(current.name)}>
               Choose this One
             </button>
-          )}
         </div>
       </div>
 
