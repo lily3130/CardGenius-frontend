@@ -3,7 +3,6 @@ import './App.css';
 import Sidebar from './sidebar';
 import PageLayout from './pagelayout';
 import CreateCardPage from "./createcardpage";
-import { cardRebateType, bankCardOptions } from './constants';
 
 function CreateCardPageLayout({ setCurrentPage, user, addCard, cardRebateType, bankCardOptions }) {
     const handleGoBack = () => setCurrentPage('searchCard');

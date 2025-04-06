@@ -62,6 +62,7 @@ function MyAccountPage({ onBack, user, setUser, adsEnabled, setAdsEnabled }) {
                 <button className="edit-button" onClick={() => handleEdit('password')}>✏️ Edit</button>
                 </div>
             </div>
+            
 
             {/* Save + Back */}
             <div className="button-group">

@@ -33,15 +33,20 @@ function App() {
     setCurrentPage("searchCard");
   };
 
-  const handleSignUp = () => {
+  const handleSignUp = (newUser) => {
+    setUser({
+      ...newUser,
+      isPremium: isPremium
+    });
     setCurrentPage("register");
   };
 
   const handleCreateAccount = (newUser) => {
-    setUser({newUser,
-      isPremium: false,
-    }); // newUser 來自註冊表單
-    setIsPremium(false); // 預設為非 premium
+    setUser({
+      ...newUser,
+      isPremium: isPremium,     // 用註冊前選的 premium 狀態
+      transactions: [],
+    });
     setCurrentPage("createCard");
   };
 
@@ -195,12 +200,12 @@ function App() {
           <SearchResultsPage
             results={searchResults}
             isPremium={user.isPremium}
+            adsEnabled={adsEnabled}
             amount={searchAmount}
             onBack={() => setCurrentPage('searchCard')}
             onCardChoose={(cardName) =>{
               handleCardChoice(cardName, searchAmount);
               setCurrentPage('cardList');
-            adsEnabled={adsEnabled}
             }}
           />
         </PageLayout>

@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import "./App.css";
 
 function RegisterPage({ onCreateAccount }) {
-    const [name, setName] = useState('');
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -10,7 +9,7 @@ function RegisterPage({ onCreateAccount }) {
   
     const handleSubmit = (e) => {
       e.preventDefault();
-      if (!name || !username || !password || !confirmPassword) {
+      if ( !username || !password || !confirmPassword) {
         setError("There are missing fields");
         return;
       }
@@ -19,7 +18,7 @@ function RegisterPage({ onCreateAccount }) {
         return;
       }
       setError('');
-      onCreateAccount({ name, username, password });
+      onCreateAccount({ username, password });
     };
     return (
       
@@ -30,18 +29,9 @@ function RegisterPage({ onCreateAccount }) {
               <label>Name:</label>
               <input
                 type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            
-            
-              <label>Username:</label>
-              <input
-                type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
               />
-            
             
               <label>Password:</label>
               <input
