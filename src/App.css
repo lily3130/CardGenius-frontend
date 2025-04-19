@@ -731,3 +731,23 @@ canvas {
 .reward-details-with-arrows.no-arrows {
   justify-content: center;
 }
+
+
+.form-wrapper {
+  width: 100%;
+  max-width: 400px;
+  background-color: white;
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.form-title {
+  font-size: 48px;
+  color: #5b46af;
+  margin-bottom: 30px;
+  text-align: center;
+}
