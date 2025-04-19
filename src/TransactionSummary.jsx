@@ -4,24 +4,23 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-function TransactionSummary({ transactions, hideTitle = false}) {
-  const categoryMap = {};
+function TransactionSummary({ summary, hideTitle = false }) {
+  if (!summary || !summary.by_category) {
+    return <p>No summary data available.</p>;
+  }
 
-  transactions.forEach((tx) => {
-    if (!categoryMap[tx.category]) {
-      categoryMap[tx.category] = 0;
-    }
-    categoryMap[tx.category] += Number(tx.amount);
-  });
+  const categoryLabels = Object.keys(summary.by_category);
+  const categoryValues = Object.values(summary.by_category).map(parseFloat);
 
   const data = {
-    labels: Object.keys(categoryMap),
+    labels: categoryLabels,
     datasets: [
       {
         label: 'Spending by Category',
-        data: Object.values(categoryMap),
+        data: categoryValues,
         backgroundColor: [
-          '#6a5acd', '#f39c12', '#2ecc71', '#3498db', '#e74c3c', '#9b59b6'
+          '#6a5acd', '#f39c12', '#2ecc71', '#3498db', '#e74c3c', '#9b59b6',
+          '#16a085', '#f1c40f', '#d35400', '#1abc9c', '#34495e'
         ],
         borderWidth: 1,
       },

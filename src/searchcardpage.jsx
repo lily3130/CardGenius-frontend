@@ -1,162 +1,192 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
-import { cardRebateType, cardTransactionMap } from './constants';
-import { fetchPost } from './api';
+import { fetchPost, fetchGet } from './api';
 
-function SearchCardPage({ onCreateCard, onViewCards, onSearch, setSearchAmount, cards = [], user, setUser }) {
+function SearchCardPage({ onSearch, setSearchAmount, cards = [], user, setUser }) {
   const [category, setCategory] = useState('');
   const [selectedTypes, setSelectedTypes] = useState([]);
   const [amount, setAmount] = useState('');
   const [rebate, setRebate] = useState('');
-  const [availableTypes, setAvailableTypes] = useState([]);
+  const [availableCategories, setAvailableCategories] = useState([]);
+  const [categoryTypesMap, setCategoryTypesMap] = useState({});
 
   useEffect(() => {
-    if (!category) {
-      setAvailableTypes([]);
-      return;
-    }
+    const fetchCardProfiles = async () => {
+      try {
+        const validCards = cards.filter(card => card.card && card.type);
+        const profiles = await Promise.all(validCards.map(async (cardObj) => {
+          const url = `/getCardProfile?card=${encodeURIComponent(cardObj.card)}&type=${encodeURIComponent(cardObj.type)}`;
+          const res = await fetchGet(url);
+          return res || [];
+        }));
 
-    const typesSet = new Set();
+        const flatProfiles = profiles.flat();
+        const categoriesSet = new Set();
+        const catMap = {};
 
-    cards.forEach((card) => {
-      const typesForCategory = cardTransactionMap[card.name]?.[category];
-      typesForCategory?.forEach((type) => typesSet.add(type));
-    });
+        flatProfiles.forEach(profile => {
+          const cat = profile.category;
+          if (!cat) return;
 
-    setAvailableTypes(Array.from(typesSet));
-  }, [category, cards]);
+          categoriesSet.add(cat);
+
+          let rateObj = {};
+
+          if (typeof profile.rate === 'string') {
+            try {
+              const keyValueRegex = /"([^"]+)":\s*([^,}]+)/g;
+              let match;
+              while ((match = keyValueRegex.exec(profile.rate)) !== null) {
+                const key = match[1];
+                let value = match[2].trim();
+                if (value.startsWith('"') && value.endsWith('"')) {
+                  value = value.slice(1, -1);
+                }
+                rateObj[key] = value;
+              }
+            } catch (err) {
+              console.warn('Manual parsing failed:', profile.rate);
+            }
+          } else if (typeof profile.rate === 'object') {
+            rateObj = profile.rate;
+          }
+
+          const keys = Object.keys(rateObj);
+          if (!catMap[cat]) catMap[cat] = new Set();
+          keys.forEach(k => catMap[cat].add(k));
+        });
+
+        const formattedMap = Object.fromEntries(
+          Object.entries(catMap).map(([k, set]) => [k, [...set]])
+        );
+
+        setAvailableCategories([...categoriesSet]);
+        setCategoryTypesMap(formattedMap);
+      } catch (err) {
+        console.error("Error fetching profiles", err);
+      }
+    };
+
+    if (cards.length > 0) fetchCardProfiles();
+  }, [cards]);
 
   const handleSearch = async (e) => {
     e.preventDefault();
   
-    const searchCriteria = {
-      category,
-      subgroup: selectedTypes,
-      amount,
-      rebate
-    };
+    if (!user?.user_id || !category || !rebate || selectedTypes.length === 0 || !amount) {
+      alert("Please complete all fields: category, rebate, at least one type, and amount.");
+      return;
+    }
   
-    // 儲存成一筆 transaction
-    const newTransaction = {
-      category,
-      rebateType: rebate,
-      amount
-    };
-
-    console.log('💡 Adding transaction:', newTransaction);
-    console.log('📦 Current transactions:', [...(user.transactions || []), newTransaction]);
-  
-    // ✅ 更新 user 的 transactions
-    setUser((prev) => ({
-      ...prev,
-      transactions: [...(prev.transactions || []), newTransaction]
-    }));
-
     try {
-      // ✅ Call backend to get recommended cards
-      const response = await fetchPost('/recommend_cards', {
+      const requestBody = {
         user_id: user.user_id,
         category,
         type: rebate,
-        amount,
-        subgroup: selectedTypes
-      });
+        subgroup: selectedTypes,
+        transaction_amount: amount.toString(),
+      };
   
-      const recommendedCards = response.cards || [];
+      console.log("📤 Sending POST request with:", requestBody);
   
-      onSearch(searchCriteria, recommendedCards);
+      const result = await fetchPost("/returnRecommendationResult", requestBody);
+  
+      if (!result || result.length === 0) {
+        alert("No recommended cards found.");
+        return;
+      }
+  
+      console.log("✅ Received recommendation result:", result);
+  
       setSearchAmount(Number(amount));
+      onSearch(
+        { category, subgroup: selectedTypes, amount, rebate },
+        result // <-- result is the array of recommended cards
+      );
+  
+      // ✅ 儲存進 user.transactions（for premium summary 用）
+      const newTransaction = { category, rebateType: rebate, amount };
+      setUser(prev => ({
+        ...prev,
+        transactions: [...(prev.transactions || []), newTransaction]
+      }));
     } catch (err) {
-      console.error('Failed to fetch recommendations:', err);
-      alert('Something went wrong while searching.');
+      console.error("❌ Recommendation API failed", err);
+      alert("Something went wrong while searching.");
     }
-  
-    // // 找到符合條件的卡片（模擬）
-    // const matched = cards.filter(card => {
-    //   const rebateMatch = rebate ? cardRebateType[card.name]?.rebateType === rebate : true;
-    //   const categoryMatch = category ? cardTransactionMap[card.name]?.[category] : true;
-    //   return rebateMatch && categoryMatch;
-    // }).map((card, index) => ({
-    //   rank: `${index + 1}${['st', 'nd', 'rd'][index] || 'th'} Choice`,
-    //   name: card.name,
-    //   rewardType: cardRebateType[card.name]?.rebateType || 'unknown',
-    //   rewardRate: (Math.random() * 0.05).toFixed(4),
-    //   rewardDetail: `Some benefit for ${category || 'selected category'} - ${rebate || 'selected rebate'}`
-    // }));
-  
-    onSearch(
-    {
-      category,
-      transactionTypes: selectedTypes,
-      amount,
-      rebate
-    },
-    recommendedCards
-    );
-    setSearchAmount(Number(amount));
   };
-  
+
+  const displayedTypes = categoryTypesMap[category] || [];
 
   return (
     <div className="centered-content">
       <h1 className="welcome-title">Which Card to Use Today</h1>
       <form className="search-form" onSubmit={handleSearch}>
         <div className="form-group">
-          <label>Categories</label>
-          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+          <label htmlFor="category-select">Categories</label>
+          <select
+            id="category-select"
+            value={category}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              setSelectedTypes([]);
+            }}
+          >
             <option value="">Select category</option>
-            <option value="bill">bill</option>
-            <option value="dining">dining</option>
-            <option value="entertainment">entertainment</option>
-            <option value="grocery">grocery</option>
-            <option value="online">online</option>
-            <option value="petrol">petrol</option>
-            <option value="shopping">shopping</option>
-            <option value="travel">travel</option>
+            {availableCategories.map(cat => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
           </select>
         </div>
 
         <div className="form-group">
           <label>Transaction Type</label>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', background: '#f9fafb', padding: '16px' }}>
-            {availableTypes.length === 0 && <div style={{ gridColumn: 'span 3' }}>Please select a category</div>}
-            {availableTypes.map((type) => (
-              <div key={type} className="checkbox-row">
-                <input
-                  type="checkbox"
-                  onChange={(e) => {
-                    setSelectedTypes(prev =>
-                      e.target.checked
-                        ? [...prev, type]
-                        : prev.filter(t => t !== type)
-                    );
-                  }}
-                />
-                <label>{type}</label>
-              </div>
-            ))}
+          <div className="transaction-type-scroll">
+            <div className="transaction-type-grid">
+              {displayedTypes.length === 0 && <div style={{ gridColumn: 'span 3' }}>Please select a category</div>}
+              {displayedTypes.map(type => (
+                <label key={type} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={selectedTypes.includes(type)}
+                    onChange={(e) =>
+                      setSelectedTypes(prev =>
+                        e.target.checked ? [...prev, type] : prev.filter(t => t !== type)
+                      )
+                    }
+                  />
+                  <span>{type}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="form-group">
-          <label>Transaction Amount</label>
-          <input
-            type="number"
-            placeholder="Insert amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </div>
-
-        <div className="form-group">
-          <label>Rebate Type</label>
-          <select value={rebate} onChange={(e) => setRebate(e.target.value)}>
-            <option value="">Select rebate</option>
-            <option value="cashback">cashback</option>
-            <option value="discount">discount</option>
-            <option value="miles">miles</option>
-            <option value="reward">reward</option>
-          </select>
+        <div className="form-row-two-cols">
+          <div className="form-group">
+            <label htmlFor="amount">Transaction Amount</label>
+            <input
+              id="amount"
+              type="number"
+              placeholder="Insert amount"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="rebate-type">Rebate Type</label>
+            <select
+              id="rebate-type"
+              value={rebate}
+              onChange={(e) => setRebate(e.target.value)}
+            >
+              <option value="">Select rebate</option>
+              <option value="cashback">cashback</option>
+              <option value="discount">discount</option>
+              <option value="mile">mile</option>
+              <option value="reward">reward</option>
+            </select>
+          </div>
         </div>
 
         <div className="button-group">
