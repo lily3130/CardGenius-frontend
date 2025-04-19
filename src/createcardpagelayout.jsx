@@ -18,6 +18,7 @@ function CreateCardPageLayout({ setCurrentPage, user, addCard, cardRebateType, b
         user={user}
       >
         <CreateCardPage
+          user={user}
           onBack={handleGoBack}
           onSaveCard={addCard}
           cardRebateType={cardRebateType}

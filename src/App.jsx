@@ -9,6 +9,7 @@ import SearchCardPage from './searchcardpage';
 import PageLayout from './pagelayout';
 import SearchResultsPage from './searchresultspage';
 import MyAccountPage from './myaccountpage';
+import SignInPage from "./signinpage"
 
 function App() {
   const [currentPage, setCurrentPage] = useState("login");
@@ -25,12 +26,29 @@ function App() {
   const [searchAmount, setSearchAmount] = useState('');
   const [adsEnabled, setAdsEnabled] = useState(true); // 預設開啟廣告
 
-  const handleSignIn = (premium) => {
-    setUser(prev => ({
-      ...prev,
-      isPremium: premium
-    }));
-    setCurrentPage("searchCard");
+  const handleLoginSuccess = async (loginData) => {
+    try {
+      // 🔄 Fetch user tier via /getUserProfile?user_id=...
+      const response = await fetch(`https://17hxyu8crd.execute-api.ap-southeast-1.amazonaws.com/getUserProfile?user_id=${loginData.userId}`);
+      const profile = await response.json();
+  
+      if (response.ok) {
+        setUser({
+          user_id: profile.user_id,
+          username: profile.user_name,
+          password: profile.psw,
+          isPremium: profile.user_tier === "1",
+          transactions: []
+        });
+        setCurrentPage("searchCard");
+      } else {
+        alert("Login succeeded but failed to retrieve user profile.");
+        setCurrentPage("login");
+      }
+    } catch (error) {
+      alert("Login succeeded but profile fetch failed.");
+      setCurrentPage("login");
+    }
   };
 
   const handleSignUp = (newUser) => {
@@ -71,7 +89,7 @@ function App() {
   };
 
   const handleSearch = (searchCriteria) => {
-    const { category, transactionTypes, amount, rebate } = searchCriteria;
+    const { category, subgroup, amount, rebate } = searchCriteria;
 
     // 根據卡片資料與搜尋條件，簡單過濾符合的卡片
     const matched = cards
@@ -124,7 +142,16 @@ function App() {
   return (
     <>
       {currentPage === "login" && (
-        <LoginPage onSignUp={handleSignUp} onSignIn={handleSignIn} />
+        <LoginPage 
+          onSignInClick={() => setCurrentPage("signin")}
+          onSignUp={handleSignUp} />
+      )}
+
+      {currentPage === "signin" && (
+        <SignInPage
+          onLoginSuccess={handleLoginSuccess}
+          onBack={() => setCurrentPage("login")}
+        />
       )}
 
       {currentPage === "register" && (
@@ -169,7 +196,7 @@ function App() {
             cards={cards}
             onBack={() => setCurrentPage('searchCard')}
             onDelete={deleteCard}
-            user={user}
+            user={{ ...user, user_id: user.user_id }} 
           />
         </PageLayout>
       )}

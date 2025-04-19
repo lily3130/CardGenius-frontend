@@ -1,8 +1,12 @@
 import React, { useState } from "react";
 import "./App.css";
 import { cardRebateType, bankCardOptions } from './constants';
+import { fetchPost } from './api';
 
-function CreateCardPage({ onBack, onSaveCard }) {
+
+const API_BASE = "https://17hxyu8crd.execute-api.ap-southeast-1.amazonaws.com";
+
+function CreateCardPage({ onBack, onSaveCard, user }) {
     const [showModal, setShowModal] = useState(false);
     const [targetAmount, setTargetAmount] = useState('');
     const [isTargetSet, setIsTargetSet] = useState(null);
@@ -22,7 +26,7 @@ function CreateCardPage({ onBack, onSaveCard }) {
       }
     };
   
-    const handleCreate = (e) => {
+    const handleCreate = async (e) => {
       e.preventDefault();
       if (!bank || !cardName || !dateApproved) {
         setError('Please fill in all fields before submitting.');
@@ -34,16 +38,29 @@ function CreateCardPage({ onBack, onSaveCard }) {
         setShowModal(true);
         return;
       }
-      const newCard = {
-        name: cardName || 'Card Name',
-        monthly: 0,
-        total: 0,
-        minSpend: 0,
-        targetAmount: isTargetSet ? parseFloat(targetAmount) : 0,
-        bank,
-        dateApproved,
-      };
+      try {
+        await fetchPost('/addCard', {
+          user_id: user.userId,
+          card: cardName,
+          type: rebateInfo.rebateType, // cashback / miles / reward / etc.
+          date_approved: dateApproved
+        });
+        alert("Card added successfully!");
+        const newCard = {
+          name: cardName || 'Card Name',
+          monthly: 0,
+          total: 0,
+          minSpend: 0,
+          targetAmount: isTargetSet ? parseFloat(targetAmount) : 0,
+          bank,
+          dateApproved,
+        };
+        
         onSaveCard(newCard);
+      } catch (err) {
+        console.error("Failed to create card:", err);
+        setError("Card creation failed. Please try again.");
+      }
     };
   
     const handleSaveModal = () => {

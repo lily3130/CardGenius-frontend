@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
 import { cardRebateType, cardTransactionMap } from './constants';
+import { fetchPost } from './api';
 
 function SearchCardPage({ onCreateCard, onViewCards, onSearch, setSearchAmount, cards = [], user, setUser }) {
   const [category, setCategory] = useState('');
@@ -25,12 +26,12 @@ function SearchCardPage({ onCreateCard, onViewCards, onSearch, setSearchAmount, 
     setAvailableTypes(Array.from(typesSet));
   }, [category, cards]);
 
-  const handleSearch = (e) => {
+  const handleSearch = async (e) => {
     e.preventDefault();
   
     const searchCriteria = {
       category,
-      transactionTypes: selectedTypes,
+      subgroup: selectedTypes,
       amount,
       rebate
     };
@@ -50,21 +51,48 @@ function SearchCardPage({ onCreateCard, onViewCards, onSearch, setSearchAmount, 
       ...prev,
       transactions: [...(prev.transactions || []), newTransaction]
     }));
+
+    try {
+      // ✅ Call backend to get recommended cards
+      const response = await fetchPost('/recommend_cards', {
+        user_id: user.user_id,
+        category,
+        type: rebate,
+        amount,
+        subgroup: selectedTypes
+      });
   
-    // 找到符合條件的卡片（模擬）
-    const matched = cards.filter(card => {
-      const rebateMatch = rebate ? cardRebateType[card.name]?.rebateType === rebate : true;
-      const categoryMatch = category ? cardTransactionMap[card.name]?.[category] : true;
-      return rebateMatch && categoryMatch;
-    }).map((card, index) => ({
-      rank: `${index + 1}${['st', 'nd', 'rd'][index] || 'th'} Choice`,
-      name: card.name,
-      rewardType: cardRebateType[card.name]?.rebateType || 'unknown',
-      rewardRate: (Math.random() * 0.05).toFixed(4),
-      rewardDetail: `Some benefit for ${category || 'selected category'} - ${rebate || 'selected rebate'}`
-    }));
+      const recommendedCards = response.cards || [];
   
-    onSearch(searchCriteria, matched);
+      onSearch(searchCriteria, recommendedCards);
+      setSearchAmount(Number(amount));
+    } catch (err) {
+      console.error('Failed to fetch recommendations:', err);
+      alert('Something went wrong while searching.');
+    }
+  
+    // // 找到符合條件的卡片（模擬）
+    // const matched = cards.filter(card => {
+    //   const rebateMatch = rebate ? cardRebateType[card.name]?.rebateType === rebate : true;
+    //   const categoryMatch = category ? cardTransactionMap[card.name]?.[category] : true;
+    //   return rebateMatch && categoryMatch;
+    // }).map((card, index) => ({
+    //   rank: `${index + 1}${['st', 'nd', 'rd'][index] || 'th'} Choice`,
+    //   name: card.name,
+    //   rewardType: cardRebateType[card.name]?.rebateType || 'unknown',
+    //   rewardRate: (Math.random() * 0.05).toFixed(4),
+    //   rewardDetail: `Some benefit for ${category || 'selected category'} - ${rebate || 'selected rebate'}`
+    // }));
+  
+    onSearch(
+    {
+      category,
+      transactionTypes: selectedTypes,
+      amount,
+      rebate
+    },
+    recommendedCards
+    );
     setSearchAmount(Number(amount));
   };
   
