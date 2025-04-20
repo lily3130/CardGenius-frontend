@@ -5,13 +5,20 @@ import { fetchGet, fetchDelete } from './api';
 function CardListPage({ onBack, user, setCardsFromDB }) {
   const [cardList, setCardList] = useState([]);
 
-  const handleDeleteCard = async (cardName) => {
+  const handleDeleteCard = async (card) => {
     try {
-      await fetchDelete(`/deleteCard?user_id=${user.user_id}&card=${encodeURIComponent(cardName)}`);
-      setCardList((prev) => prev.filter((card) => card.name !== cardName));
+      const { user_id } = user;
+      const { card: cardName, type } = card;
+
+      await fetchDelete(`/deleteCard?user_id=${user_id}&card=${encodeURIComponent(cardName)}&type=${encodeURIComponent(type)}`);
+
+      setCardList((prev) =>
+        prev.filter((c) => !(c.card === cardName && c.type === type))
+      );
+
       alert("✅ Card deleted successfully.");
     } catch (err) {
-      console.error('Failed to delete card:', err);
+      console.error('❌ Failed to delete card:', err);
       alert('Failed to delete card.');
     }
   };
@@ -24,17 +31,15 @@ function CardListPage({ onBack, user, setCardsFromDB }) {
 
         const formatted = data.map((card) => ({
           name: card.card,
-          card: card.card,            // ✅ 必須保留原始 card 字段
-          type: card.type,            // ✅ 為了 getCardProfile 用
+          card: card.card,
+          type: card.type,
           dateApproved: card.date_approved,
           total: parseFloat(card.accumulate_amount || 0),
-          monthly: 0,
-          minSpend: 0,
-          targetAmount: 0,
+          targetAmount: parseFloat(card.target_amount || 0),
         }));
 
         setCardList(formatted);
-        setCardsFromDB(formatted); // ✅ 更新 App 裡的 cards state
+        setCardsFromDB(formatted);
       } catch (err) {
         console.error('Failed to load user cards:', err);
       }
@@ -54,22 +59,20 @@ function CardListPage({ onBack, user, setCardsFromDB }) {
           {cardList.map((card, index) => (
             <div className="card-item" key={index}>
               <div className="card-info">
-                <div className="card-image-placeholder"></div>
+                {/* 圖片 placeholder 已移除 */}
                 <div className="card-details">
                   <div className="card-name">{card.name}</div>
-                  <div className="card-meta">Type: {card.type}</div> {/* ⬅️ 新增這行 */}
-                  <div className="card-meta">This Month Spending: ${card.monthly}</div>
+                  <div className="card-meta">Type: {card.type}</div>
                   <div className="card-meta">Historical Spending: ${card.total}</div>
-                  <div className="card-meta">Monthly Minimum Spend: ${card.minSpend}</div>
                   {card.type === "reward" && (
-                    <div>🎯 Reward Target: ${card.targetAmount}</div>
+                    <div className="card-meta">Reward Target: ${card.targetAmount}</div>
                   )}
                   {card.dateApproved && (
                     <div className="card-meta">Date Approved: {card.dateApproved}</div>
                   )}
                 </div>
               </div>
-              <button className="delete-button" onClick={() => handleDeleteCard(card.name)}>
+              <button className="delete-button" onClick={() => handleDeleteCard(card)}>
                 🗑 Delete
               </button>
               <hr />

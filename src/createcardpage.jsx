@@ -15,11 +15,13 @@ function CreateCardPage({ onBack, onSaveCard, user }) {
   const [cardOptions, setCardOptions] = useState([]);
   const [cardRebateTypeMap, setCardRebateTypeMap] = useState({});
   const [pendingSubmit, setPendingSubmit] = useState(false);
+  const [cardType, setCardType] = useState('');
 
   useEffect(() => {
     const fetchDatabaseCards = async () => {
       try {
         const data = await fetchGet('/getDatabaseCards');
+        console.log("📦 fetched card data:", data);
         setDatabaseCards(data);
 
         const banks = [...new Set(data.map(card => card.bank))];
@@ -30,6 +32,7 @@ function CreateCardPage({ onBack, onSaveCard, user }) {
           rebateMap[card.card] = { rebateType: card.type };
         });
         setCardRebateTypeMap(rebateMap);
+        
       } catch (err) {
         console.error("Failed to fetch database cards:", err);
       }
@@ -48,75 +51,116 @@ function CreateCardPage({ onBack, onSaveCard, user }) {
     setCardOptions(filteredCards);
   };
 
-  const handleCardChange = (e) => {
+  const handleCardChange = async (e) => {
     const selectedCard = e.target.value;
     setCardName(selectedCard);
-
-    const selectedCardObj = databaseCards.find(card => card.card === selectedCard);
-    if (selectedCardObj?.type === 'reward') {
+  
+    const selectedCardObj = databaseCards.find(
+      card => card.card.trim().toLowerCase() === selectedCard.trim().toLowerCase()
+    );
+  
+    if (!selectedCardObj) {
+      console.warn("❗ 無法找到卡片對應的 databaseCard:", selectedCard);
+      setCardType('unknown');
+      return;
+    }
+  
+    console.log("🌐 selectedCardObj GET:", selectedCardObj);
+  
+    // 🔧 type is now array, e.g., ["mile", "reward"]
+    const typeList = selectedCardObj.type || [];
+    const hasReward = Array.isArray(typeList) && typeList.includes("reward");
+  
+    // ✅ 這裡根據是否包含 reward，設定 type 和顯示 modal
+    if (hasReward) {
+      setCardType("reward");
       setIsTargetSet(null);
       setTargetAmount('');
       setShowModal(true);
+    } else {
+      // 如果是單一類型（非 reward），就選第一個作為 type
+      const firstType = Array.isArray(typeList) && typeList.length > 0 ? typeList[0] : 'unknown';
+      setCardType(firstType);
     }
   };
+  
+  
+  
+
+  console.log("🧾 cardType before submit:", cardType);
 
   const handleCreate = async (e) => {
     e.preventDefault();
-
+  
     if (!bank || !cardName || !dateApproved) {
       setError('Please fill in all fields before submitting.');
       return;
     }
-
-    const rebateInfo = cardRebateTypeMap[cardName];
-
-    if (rebateInfo?.rebateType === 'reward' && isTargetSet === null) {
+  
+    if (cardType === 'reward' && isTargetSet === null) {
       setShowModal(true);
       setPendingSubmit(true);
       return;
     }
-
+  
+    const payload = {
+      user_id: String(user.user_id),
+      card: String(cardName),
+      date_approved: String(dateApproved),
+      target_amount: String(
+        cardType === 'reward'
+          ? (isTargetSet ? String(parseInt(targetAmount || '0', 10)) : '0')
+          : '0.00'
+      )
+    };
+  
+    console.log('📦 payload to submit (no type):', payload);
+  
     try {
-      await fetchPost('/addCard', {
-        user_id: user.user_id,
-        card: cardName,
-        type: rebateInfo.rebateType,
-        date_approved: dateApproved,
-        target_amount: isTargetSet ? parseFloat(targetAmount) : 0
-      });
-
+      await fetchPost('/addCard', payload);
+  
       const formattedCard = {
         name: cardName,
         card: cardName,
-        type: rebateInfo.rebateType,
+        type: cardType,  // 前端還是可以記錄
         monthly: 0,
         total: 0,
         minSpend: 0,
-        targetAmount: isTargetSet ? parseFloat(targetAmount) : 0,
+        targetAmount: payload.target_amount,
         bank,
         dateApproved
       };
-
+  
       onSaveCard(formattedCard);
     } catch (err) {
-      console.error("Failed to create card:", err);
+      console.error("❌ Failed to create card:", err);
       setError("Card creation failed. Please try again.");
     }
   };
+  
+  
+  
 
   const handleSaveModal = () => {
     if (isTargetSet && (!targetAmount || isNaN(targetAmount))) {
       alert("Please enter a valid target amount.");
       return;
     }
-
+  
     setShowModal(false);
-
+  
     if (pendingSubmit) {
       setPendingSubmit(false);
-      handleCreate(new Event("submit"));
+  
+      // ✅ 延遲一點點讓 modal 關掉
+      setTimeout(() => {
+        document.getElementById("create-card-form").dispatchEvent(
+          new Event("submit", { cancelable: true, bubbles: true })
+        );
+      }, 100); // optional: small delay
     }
   };
+  
 
   return (
     <>
@@ -168,7 +212,12 @@ function CreateCardPage({ onBack, onSaveCard, user }) {
               Want to set a target amount for a reward?
             </p>
             <div className="modal-option">
-              <input type="radio" name="reward" onChange={() => setIsTargetSet(true)} />
+              <input
+                type="radio"
+                name="reward"
+                checked={isTargetSet === true}
+                onChange={() => setIsTargetSet(true)}
+              />
               <label>
                 Yes. My target amount is:
                 <input
@@ -181,7 +230,12 @@ function CreateCardPage({ onBack, onSaveCard, user }) {
               </label>
             </div>
             <div className="modal-option">
-              <input type="radio" name="reward" onChange={() => setIsTargetSet(false)} />
+              <input
+                type="radio"
+                name="reward"
+                checked={isTargetSet === false}
+                onChange={() => setIsTargetSet(false)}
+              />
               <label>No</label>
             </div>
             <div className='button-container'>

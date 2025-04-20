@@ -23,32 +23,36 @@ function App() {
   const [searchResults, setSearchResults] = useState([]);
   const [searchAmount, setSearchAmount] = useState('');
   const [adsEnabled, setAdsEnabled] = useState(true);
+  const [searchRebateType, setSearchRebateType] = useState('');
 
   const handleLoginSuccess = async (loginData) => {
     try {
       const response = await fetch(`https://17hxyu8crd.execute-api.ap-southeast-1.amazonaws.com/getUserProfile?user_id=${loginData.userId}`);
-      const profile = await response.json();
-
-      if (response.ok) {
-        const updatedUser = {
-          user_id: profile.user_id,
-          username: profile.user_name,
-          password: profile.psw,
-          account: profile.account,
-          isPremium: profile.user_tier === 1,
-          transactions: []
-        };
-        console.log("🎉 Logged-in user:", profile);
-        console.log("🌟 isPremium:", profile.user_tier === 1);
-
-        setUser(updatedUser);
-        console.log("✅ setUser updated:", updatedUser);
-        await fetchUserCards(profile.user_id);
-        setCurrentPage("searchCard");
-      } else {
+      const text = await response.text();
+  
+      if (!response.ok || !text) {
+        console.warn("⚠️ Failed or empty response body");
         alert("Login succeeded but failed to retrieve user profile.");
         setCurrentPage("login");
+        return;
       }
+  
+      const profile = JSON.parse(text);
+  
+      const updatedUser = {
+        user_id: profile.user_id,
+        username: profile.user_name,
+        password: profile.psw,
+        account: profile.account,
+        isPremium: profile.user_tier === 1,
+        transactions: []
+      };
+  
+      console.log("🎉 Logged-in user:", profile);
+      setUser(updatedUser);
+      await fetchUserCards(profile.user_id);
+      setCurrentPage("searchCard");
+  
     } catch (error) {
       console.error("Login error:", error);
       alert("Login succeeded but profile fetch failed.");
@@ -87,79 +91,73 @@ function App() {
   };
 
   const handleSearch = (criteria, recommendedCards) => {
+    setSearchRebateType(criteria.rebate);  // 👈 新增這行！
+  
     const matched = recommendedCards
       .slice(0, user.isPremium ? 3 : 1)
       .map((card, index) => ({
         rank: `${index + 1}${['st', 'nd', 'rd'][index] || 'th'} Choice`,
         name: card.card || card.name,
-        rewardType: card.type || card.rebateType || 'unknown',
+        rewardType: criteria.rebate,  // ✅ 這也會正確傳下去
         rewardRate: extractRateText(card.rate, criteria.subgroup),
         rewardDetail: card.text || '-',
         imageUrl: card.image_url || card.imageUrl || ''
       }));
-
+  
     setSearchResults(matched);
     setCurrentPage("searchResults");
   };
+  
 
   
-  const handleCardChoice = async (cardName, amount, type) => {
-    // 更新前端卡片狀態
-    const numericAmount = parseFloat(amount);
-    setCards(prev =>
-      prev.map(card =>
-        card.name === cardName
-          ? {
-              ...card,
-              monthly: card.monthly + numericAmount,
-              total: card.total + numericAmount,
-            }
-          : card
-      )
-    );
-  
-    // 如果是 premium，用戶交易紀錄也要更新
-    if (user.isPremium) {
-      const newTransaction = { selectedCard: cardName, amount };
-      setUser(prev => ({
-        ...prev,
-        transactions: [...(prev.transactions || []), newTransaction],
-      }));
-    }
-  
-    // ✅ 更新後端 accumulate amount
+  const handleCardChoose = async (cardName, amount, rewardType) => {
     try {
-      const selectedCard = cards.find(c => c.name === cardName);
+      const candidates = cards.filter(c => c.card === cardName);
+      console.log("🔍 Matching candidates:", candidates);
+  
+      const normalized = (val) =>
+        Array.isArray(val)
+          ? val.map((v) => v.toLowerCase())
+          : typeof val === 'string'
+          ? [val.toLowerCase()]
+          : [];
+  
+      const matched = candidates.find(c => {
+        const candidateTypes = normalized(c.type);
+        const targetType = rewardType?.toLowerCase();
+        return candidateTypes.includes(targetType);
+      });
+  
+      const selectedCard = matched || candidates[0];
+      const cardType = typeof selectedCard?.type === 'string'
+        ? selectedCard.type
+        : Array.isArray(selectedCard?.type)
+        ? selectedCard.type.find(t => t.toLowerCase() === rewardType.toLowerCase()) || selectedCard.type[0]
+        : rewardType || 'unknown';
+  
       const payload = {
         user_id: String(user.user_id),
-        card: String(cardName),
+        card: cardName,
         amount: String(amount),
-        type: String(selectedCard?.type || 'unknown')
+        type: cardType,
       };
   
-      console.log('📦 PATCH payload:', payload);
-      await fetchPatch('/updateAccumulateAmount', payload);
-      console.log('✅ Backend updated accumulate amount');
+      console.log("📦 PATCH payload:", payload);
+      await fetchPatch("/updateAccumulateAmount", payload);
   
-      // ✅ 再次從後端撈卡片，讓畫面更新
-      const data = await fetchGet(`/getAllCards?user_id=${user.user_id}`);
-      const formatted = data.map(card => ({
-        name: card.card,
-        card: card.card,
-        type: card.type,
-        monthly: 0,
-        total: parseFloat(card.accumulate_amount || 0),
-        minSpend: 0,
-        targetAmount: 0,
-        dateApproved: card.date_approved,
-      }));
-  
-      setCards(formatted);
+      const updated = cards.map((c) =>
+        c.card === cardName && c.type === cardType
+          ? { ...c, total: c.total + Number(amount) }
+          : c
+      );
+      setCards(updated);
     } catch (err) {
-      console.error('❌ Failed to update backend accumulate amount:', err);
-      alert('Failed to update backend accumulate amount.');
+      console.error("❌ Failed to update accumulate amount:", err);
+      alert("Failed to update backend accumulate amount.");
     }
   };
+  
+  
 
   // Update this function in your App.js file
 
@@ -217,10 +215,8 @@ function extractRateText(rateString, subgroups = []) {
         <SignInPage onLoginSuccess={handleLoginSuccess} onBack={() => setCurrentPage("login")} />
       )}
       {currentPage === "register" && (
-        <RegisterPage onCreateAccount={(newUser) => {
-          setUser({ ...newUser, isPremium: false, transactions: [] });
-          setCurrentPage("createCard");
-        }} />
+        <RegisterPage onCreateAccount={() => setCurrentPage("login")} />
+
       )}
       {currentPage === "createCard" && (
         <CreateCardPageLayout setCurrentPage={setCurrentPage} user={user} addCard={addCard} />
@@ -248,9 +244,11 @@ function extractRateText(rateString, subgroups = []) {
             amount={searchAmount}
             isPremium={user.isPremium}
             adsEnabled={adsEnabled}
+            searchRebateType={searchRebateType}
             onBack={() => setCurrentPage("searchCard")}
-            onCardChoose={(cardName) => {
-              handleCardChoice(cardName, searchAmount);
+            onCardChoose={async (cardName, type) => {
+              await handleCardChoose(cardName, searchAmount, searchRebateType);
+              await fetchUserCards(user.user_id);  // ← 新增這行！
               setCurrentPage("cardList");
             }}
           />

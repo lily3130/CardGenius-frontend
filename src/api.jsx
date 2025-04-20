@@ -1,20 +1,33 @@
 const BASE_URL = 'https://17hxyu8crd.execute-api.ap-southeast-1.amazonaws.com'; // <-- change this to your backend URL
 
 export async function fetchGet(endpoint) {
-  try {
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    if (!res.ok) throw new Error(`GET failed: ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.error('GET Error:', err);
-    throw err;
+    try {
+      const res = await fetch(`${BASE_URL}${endpoint}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+  
+      if (!res.ok) {
+        const text = await res.text();
+        console.warn("⚠️ GET not OK. Status:", res.status, "Body:", text);
+        throw new Error(`GET failed: ${res.status}`);
+      }
+  
+      const text = await res.text();
+  
+      if (!text) {
+        console.warn("⚠️ Response body is empty");
+        return null;
+      }
+  
+      return JSON.parse(text);
+    } catch (err) {
+      console.error("GET Error:", err);
+      throw err;
+    }
   }
-}
 
 export async function fetchPost(endpoint, body) {
     try {

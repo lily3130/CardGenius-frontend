@@ -7,6 +7,7 @@ function SearchResultsPage({
   onBack,
   onCardChoose,
   adsEnabled,
+  searchRebateType,
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   console.log("👑 isPremium:", isPremium);
@@ -45,13 +46,6 @@ function SearchResultsPage({
         <div className="card-header">
           <div>
             <h2>{current.name}</h2>
-            <div>
-              <strong>Category:</strong> {current.category}
-            </div>
-            <div>
-              <strong>Transaction Types:</strong>{" "}
-              {current.transactionTypes?.join(", ")}
-            </div>
             <div>
               <strong>Reward Type:</strong> {current.rewardType}
             </div>
@@ -112,7 +106,9 @@ function SearchResultsPage({
             </button>
             <button
               className="button"
-              onClick={() => onCardChoose(current.name, current.rewardType)}
+              onClick={() =>
+                onCardChoose(current.name, current.rewardAmount, searchRebateType)
+              }
             >
               Choose this One
             </button>

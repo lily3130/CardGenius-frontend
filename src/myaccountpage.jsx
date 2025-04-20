@@ -13,6 +13,9 @@ function MyAccountPage({ onBack, user, setUser, adsEnabled, setAdsEnabled }) {
   const [localAccount, setLocalAccount] = useState(user.account);
   const [localPassword, setLocalPassword] = useState(user.password);
   const [summaryData, setSummaryData] = useState(null);
+  const [reloadFlag, setReloadFlag] = useState(false);
+
+  console.log("👤 User in MyAccountPage:", user);
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -36,7 +39,7 @@ function MyAccountPage({ onBack, user, setUser, adsEnabled, setAdsEnabled }) {
     };
   
     fetchSummary();
-  }, [user]);
+  }, [user, reloadFlag]);
 
   const handleEdit = (field) => {
     setIsEditing((prev) => ({ ...prev, [field]: true }));
@@ -145,13 +148,9 @@ function MyAccountPage({ onBack, user, setUser, adsEnabled, setAdsEnabled }) {
           <input
             type="checkbox"
             checked={adsEnabled}
-            disabled={!user.isPremium}
-            onChange={(e) => {
-              if (user.isPremium) {
-                setAdsEnabled(e.target.checked);
-              }
-            }}
-          />
+            onChange={(e) => setAdsEnabled(e.target.checked)}
+            disabled={!user.isPremium ? true : false}
+            />
           <span style={{ color: "#aaa" }}>
             {user.isPremium ? "Turn off ads" : "Buy Premium to turn off"}
           </span>
@@ -166,7 +165,15 @@ function MyAccountPage({ onBack, user, setUser, adsEnabled, setAdsEnabled }) {
       {/* 右側圖表（Premium 才會顯示） */}
       {user.isPremium && summaryData && (
         <div className="account-right-column">
-            <h1 className="transaction-summary-title">Spending Overview</h1>
+            <h1 className="transaction-summary-title">
+            Spending Overview
+            <button
+                onClick={() => setReloadFlag(prev => !prev)}
+                style={{ marginLeft: 12, fontSize: 14 }}
+            >
+                🔄 Refresh
+            </button>
+            </h1>
             <TransactionSummary summary={summaryData} hideTitle={true} />
         </div>
         )}

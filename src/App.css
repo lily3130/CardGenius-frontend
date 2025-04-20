@@ -241,7 +241,7 @@ body, html, #root {
 .centered-content {
   display: flex;
   flex-direction: column;
-  
+  padding-top: 40px;
   align-items: center;
   height: 100%;                /* 滿高 */
   width: 100%;
@@ -479,6 +479,7 @@ body, html, #root {
   width: 100%;
   box-sizing: border-box;
   margin-bottom: 2rem;
+  margin-top: -10px;
 }
 
 .result-footer {
